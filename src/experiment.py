@@ -1,13 +1,3 @@
-"""
-Main experiment orchestration script.
-
-Runs the full pipeline:
-1. Generate datasets
-2. Run behavioral experiments
-3. Train probes
-4. Run interventions
-"""
-
 import argparse
 import json
 import os
@@ -18,7 +8,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Add project root to path for imports
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -31,7 +20,6 @@ from interventions import ActivationSteerer, create_steering_vector_from_probe
 
 
 class ExperimentRunner:
-    """Orchestrates the full experiment pipeline."""
     
     def __init__(
         self,
@@ -42,17 +30,14 @@ class ExperimentRunner:
         self.model_name = model_name
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        # Ensure subdirectories exist
         (self.data_dir / "generated").mkdir(parents=True, exist_ok=True)
         (self.data_dir / "results").mkdir(parents=True, exist_ok=True)
         
-        # Initialize components
         self.generator = DatasetGenerator(seed=42)
         self.model = HookedModel(model_name, device=device)
         self.metrics_calc = MetricsCalculator()
         self.probe_trainer = ProbeTrainer()
         
-        # Get layer names for hooking
         self.layer_names = get_default_layers(model_name, n_layers=5)
         print(f"Will hook layers: {self.layer_names}")
     
@@ -63,7 +48,6 @@ class ExperimentRunner:
         domains: List[str] = None,
         save_path: str = None
     ) -> List[Conversation]:
-        """Stage 1: Generate conversation datasets."""
         print("=" * 60)
         print("STAGE 1: Generating datasets")
         print("=" * 60)
@@ -95,12 +79,10 @@ class ExperimentRunner:
         load_path: str = None,
         save_results: bool = True
     ) -> tuple[List[ConversationMetrics], pd.DataFrame]:
-        """Stage 2: Run behavioral experiments and compute metrics."""
         print("=" * 60)
         print("STAGE 2: Running behavioral experiments")
         print("=" * 60)
         
-        # Load conversations if needed
         if conversations is None:
             if load_path is None:
                 load_path = self.data_dir / "generated" / "conversations.json"
@@ -108,7 +90,6 @@ class ExperimentRunner:
         
         print(f"Running {len(conversations)} conversations through model...")
         
-        # Run model
         model_outputs = self.model.run_batch(
             conversations,
             layer_names=self.layer_names,
@@ -117,14 +98,12 @@ class ExperimentRunner:
             temperature=0.0
         )
         
-        # Compute metrics
         print("Computing metrics...")
         metrics_list = [
             self.metrics_calc.compute_metrics(conv, output)
             for conv, output in zip(conversations, model_outputs)
         ]
         
-        # Summary statistics
         stats = self.metrics_calc.compute_summary_stats(metrics_list)
         
         print("\n" + "=" * 60)
@@ -142,10 +121,8 @@ class ExperimentRunner:
             print(f"  Low-trust, True: {stats['low_trust_final_True_ur']:.3f}")
             print(f"  Low-trust, False: {stats['low_trust_final_False_ur']:.3f}")
         
-        # Convert to DataFrame
         df = self.metrics_calc.metrics_to_dataframe(metrics_list)
         
-        # Save results
         if save_results:
             results_path = self.data_dir / "results" / "behavioral_results.csv"
             results_path.parent.mkdir(parents=True, exist_ok=True)
@@ -158,22 +135,18 @@ class ExperimentRunner:
             print(f"\nResults saved to: {results_path}")
             print(f"Stats saved to: {stats_path}")
         
-        # Create plots
         self._plot_behavioral_results(df, stats)
         
         return metrics_list, df
     
     def _plot_behavioral_results(self, df: pd.DataFrame, stats: Dict):
-        """Create visualization plots."""
         fig, axes = plt.subplots(1, 2, figsize=(12, 5))
         
-        # Plot 1: Update rate by condition
         sns.barplot(data=df, x="condition", y="update_rate", ax=axes[0])
         axes[0].set_title("Update Rate by Trust Condition")
         axes[0].set_ylabel("Update Rate")
         axes[0].set_ylim(0, 1)
         
-        # Plot 2: Update rate by condition and final truth
         if "final_correction_true" in df.columns:
             sns.barplot(
                 data=df,
@@ -199,18 +172,15 @@ class ExperimentRunner:
         model_outputs: List = None,
         load_path: str = None
     ) -> Dict:
-        """Stage 3: Train probes on hidden states."""
         print("=" * 60)
         print("STAGE 3: Training probes")
         print("=" * 60)
         
-        # Load or use provided data
         if conversations is None or model_outputs is None:
             if load_path is None:
                 load_path = self.data_dir / "generated" / "conversations.json"
             conversations = self.generator.load_conversations(str(load_path))
             
-            # Re-run model if needed
             print("Running model to extract hidden states...")
             model_outputs = self.model.run_batch(
                 conversations,
@@ -218,7 +188,6 @@ class ExperimentRunner:
                 extract_hidden_at="last_user_token"
             )
         
-        # Train probes
         print("Training probes...")
         probe_results = self.probe_trainer.train_probes(
             model_outputs,
@@ -236,7 +205,6 @@ class ExperimentRunner:
                 print(f"  Test Accuracy: {metrics['test_accuracy']:.3f}")
                 print(f"  Test AUC: {metrics['test_auc']:.3f}")
         
-        # Check correlation with behavior
         print("\nComputing correlation with update behavior...")
         metrics_list = [
             self.metrics_calc.compute_metrics(conv, output)
@@ -258,7 +226,6 @@ class ExperimentRunner:
                 except Exception as e:
                     print(f"Error computing correlation for {layer_name}: {e}")
         
-        # Save results
         results_path = self.data_dir / "results" / "probe_results.json"
         with open(results_path, 'w') as f:
             json.dump({
@@ -276,7 +243,6 @@ class ExperimentRunner:
         layer_name: str = None,
         steering_strengths: List[float] = None
     ) -> Dict:
-        """Stage 4: Run intervention experiments."""
         print("=" * 60)
         print("STAGE 4: Running interventions")
         print("=" * 60)
@@ -285,21 +251,15 @@ class ExperimentRunner:
             load_path = self.data_dir / "generated" / "conversations.json"
             conversations = self.generator.load_conversations(str(load_path))
         
-        # Select a subset for intervention (faster)
         test_conversations = conversations[:20]
         
-        # Find a layer with a trained probe
         if layer_name is None:
-            # Try to find the best layer with a trained probe
-            # Prefer layer 2 (best test AUC from results)
             available_layers = [l for l in self.layer_names if l in self.probe_trainer.probes]
             
             if not available_layers:
-                # Try loading probes from saved results
                 probe_results_path = self.data_dir / "results" / "probe_results.json"
                 if probe_results_path.exists():
                     print("Loading probes from saved results...")
-                    # We'd need to reload probes, but for now, try to train them
                     print("No probes found. Running probe training first...")
                     self.stage_probe(conversations=conversations)
                     available_layers = [l for l in self.layer_names if l in self.probe_trainer.probes]
@@ -310,13 +270,11 @@ class ExperimentRunner:
                         "or run '--stage all' to run all stages in sequence."
                     )
             
-            # Prefer layer 2 (transformer.h.2) if available, as it had best test AUC
             if "transformer.h.2" in available_layers:
                 layer_name = "transformer.h.2"
             else:
-                layer_name = available_layers[0]  # Use first available
+                layer_name = available_layers[0]
         
-        # Create steering vector from probe
         if layer_name not in self.probe_trainer.probes:
             raise ValueError(
                 f"No probe found for layer {layer_name}. "
@@ -328,7 +286,6 @@ class ExperimentRunner:
         steering_vector = SteeringVector.from_probe(probe, layer_name)
         print(f"Using probe from layer: {layer_name}")
         
-        # Run steering experiment
         steerer = ActivationSteerer(self.model)
         steerer.register_steering_vector(steering_vector)
         
@@ -342,7 +299,6 @@ class ExperimentRunner:
             steering_strengths
         )
         
-        # Compute metrics for each strength
         intervention_metrics = {}
         for strength, outputs in steering_results.items():
             metrics = [
@@ -361,7 +317,6 @@ class ExperimentRunner:
         for strength, metrics in sorted(intervention_metrics.items()):
             print(f"Steering strength {strength:+.1f}: UR = {metrics['mean_update_rate']:.3f}")
         
-        # Save results
         results_path = self.data_dir / "results" / "intervention_results.json"
         with open(results_path, 'w') as f:
             json.dump(intervention_metrics, f, indent=2)
@@ -407,14 +362,12 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize runner
     runner = ExperimentRunner(
         model_name=args.model,
         data_dir=args.data_dir,
         device=args.device
     )
     
-    # Run stages
     if args.stage == "generate" or args.stage == "all":
         runner.stage_generate(n_items=args.n_items)
     
@@ -430,4 +383,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

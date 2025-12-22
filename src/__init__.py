@@ -1,11 +1,3 @@
-"""
-Earned Trust Experiment Package
-
-A minimal but rigorous experiment showing:
-(a) A measurable "earned trust" effect in behavior
-(b) Evidence for an internal latent signal (probe / patching)
-"""
-
 __version__ = "0.1.0"
 
 from .dataset import DatasetGenerator, Conversation
@@ -26,4 +18,3 @@ __all__ = [
     "ActivationSteerer",
     "SteeringVector",
 ]
-
