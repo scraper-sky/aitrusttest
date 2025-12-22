@@ -78,6 +78,8 @@ class HookedModel:
             model_to_hook = self.model.model
         elif hasattr(self.model, 'transformer'):
             model_to_hook = self.model.transformer
+        elif hasattr(self.model, 'layers'):
+            model_to_hook = self.model
         
         all_module_names = list(dict(model_to_hook.named_modules()).keys())
         
@@ -223,7 +225,9 @@ def get_default_layers(model_name: str, n_layers: int = 5) -> List[str]:
             pattern = "transformer.h.{}"
         elif "pythia" in model_name_lower or "gpt-neox" in model_name_lower or "gpt_neox" in model_name_lower:
             pattern = "gpt_neox.layers.{}"
-        elif any(x in model_name_lower for x in ["gemma", "llama", "mistral", "phi"]):
+        elif "phi" in model_name_lower:
+            pattern = "layers.{}"
+        elif any(x in model_name_lower for x in ["gemma", "llama", "mistral"]):
             pattern = "model.layers.{}"
         else:
             pattern = "model.layers.{}"
