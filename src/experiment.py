@@ -42,6 +42,9 @@ class ExperimentRunner:
         self.model_name = model_name
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        # Ensure subdirectories exist
+        (self.data_dir / "generated").mkdir(parents=True, exist_ok=True)
+        (self.data_dir / "results").mkdir(parents=True, exist_ok=True)
         
         # Initialize components
         self.generator = DatasetGenerator(seed=42)

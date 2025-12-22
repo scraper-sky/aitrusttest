@@ -210,6 +210,10 @@ class DatasetGenerator:
     
     def save_conversations(self, conversations: List[Conversation], path: str):
         """Save conversations to JSON file."""
+        # Create directory if it doesn't exist
+        from pathlib import Path
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        
         data = [asdict(conv) for conv in conversations]
         with open(path, 'w') as f:
             json.dump(data, f, indent=2)
