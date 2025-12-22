@@ -73,13 +73,24 @@ class HookedModel:
         self.clear_hooks()
         self.activations = {}
         
+        all_module_names = list(dict(self.model.model.named_modules()).keys())
+        
         for layer_name in layer_names:
             try:
-                layer = dict(self.model.named_modules())[layer_name]
+                layer = dict(self.model.model.named_modules())[layer_name]
                 handle = layer.register_forward_hook(self._make_hook(layer_name))
                 self.hook_handles.append(handle)
             except KeyError:
                 print(f"Warning: Layer {layer_name} not found, skipping")
+                layer_num = layer_name.split('.')[-1]
+                possible_matches = [name for name in all_module_names if f".{layer_num}" in name or f".{layer_num}." in name]
+                if possible_matches:
+                    print(f"  Possible matches: {possible_matches[:3]}")
+                else:
+                    layer_keywords = ["layer", "transformer", "gpt_neox", "h."]
+                    relevant_names = [name for name in all_module_names if any(kw in name.lower() for kw in layer_keywords)]
+                    if relevant_names:
+                        print(f"  Sample layer names in model: {relevant_names[:5]}")
     
     def clear_hooks(self):
         for handle in self.hook_handles:
@@ -204,6 +215,8 @@ def get_default_layers(model_name: str, n_layers: int = 5) -> List[str]:
         model_name_lower = model_name.lower()
         if "gpt2" in model_name_lower:
             pattern = "transformer.h.{}"
+        elif "pythia" in model_name_lower or "gpt-neox" in model_name_lower or "gpt_neox" in model_name_lower:
+            pattern = "gpt_neox.layers.{}"
         elif any(x in model_name_lower for x in ["gemma", "llama", "mistral", "phi"]):
             pattern = "model.layers.{}"
         else:
@@ -212,6 +225,13 @@ def get_default_layers(model_name: str, n_layers: int = 5) -> List[str]:
         return [pattern.format(idx) for idx in layer_indices]
     
     return [f"transformer.h.{idx}" for idx in [2, 4, 6, 8, 10]]
+
+
+def list_available_layers(model):
+    """Helper function to list available layer names in a model."""
+    all_modules = dict(model.named_modules())
+    layer_names = [name for name in all_modules.keys() if 'layer' in name.lower() or 'transformer.h' in name or 'gpt_neox' in name]
+    return sorted(layer_names)
 
 
 if __name__ == "__main__":
