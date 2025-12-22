@@ -46,7 +46,8 @@ class ExperimentRunner:
         n_items: int = 50,
         n_history_turns: int = 4,
         domains: List[str] = None,
-        save_path: str = None
+        save_path: str = None,
+        neutral_assistant_responses: bool = False
     ) -> List[Conversation]:
         print("=" * 60)
         print("STAGE 1: Generating datasets")
@@ -58,7 +59,8 @@ class ExperimentRunner:
         conversations = self.generator.generate_paired_dataset(
             n_base_items=n_items,
             n_history_turns=n_history_turns,
-            domains=domains
+            domains=domains,
+            neutral_assistant_responses=neutral_assistant_responses
         )
         
         if save_path is None:
@@ -392,6 +394,11 @@ def main():
         type=str,
         default="data",
         help="Data directory"
+    )
+    parser.add_argument(
+        "--neutral-responses",
+        action="store_true",
+        help="Use neutral assistant responses (transcript control)"
     )
     
     args = parser.parse_args()
