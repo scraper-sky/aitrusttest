@@ -140,14 +140,24 @@ class HookedModel:
         input_ids = inputs["input_ids"]
         attention_mask = inputs.get("attention_mask", None)
         
-        # Determine where to extract hidden states
-        hook_positions = {}
+        # Extract hidden states BEFORE generation (if needed)
+        hidden_states = {}
         if extract_hidden_at == "last_user_token":
-            # Last token of input (before generation)
-            hook_positions["extraction_point"] = input_ids.shape[1] - 1
-        elif extract_hidden_at == "first_assistant_token":
-            # We'll extract after generating first token
-            hook_positions["extraction_point"] = input_ids.shape[1]
+            # Do a forward pass to get hidden states at the last user token
+            with torch.no_grad():
+                # Clear any previous activations
+                self.activations = {}
+                # Forward pass on input only
+                model_outputs = self.model(input_ids, attention_mask=attention_mask, output_hidden_states=False)
+            
+            # Extract from hooks (captured during forward pass)
+            if self.activations:
+                for layer_name, activations in self.activations.items():
+                    # activations shape: [batch, seq_len, hidden_dim]
+                    seq_len = activations.shape[1]
+                    # Use last token of input
+                    idx = min(input_ids.shape[1] - 1, seq_len - 1)
+                    hidden_states[layer_name] = activations[0, idx, :]
         
         # Prepare generation kwargs
         generation_kwargs = {
@@ -168,7 +178,10 @@ class HookedModel:
         if attention_mask is not None:
             generation_kwargs["attention_mask"] = attention_mask
         
-        # Generate response
+        # Generate response (clear hooks first to avoid capturing generation activations)
+        if extract_hidden_at != "last_user_token":
+            self.activations = {}  # Clear for generation if we're not extracting from input
+        
         with torch.no_grad():
             outputs = self.model.generate(
                 input_ids,
@@ -182,22 +195,13 @@ class HookedModel:
             skip_special_tokens=True
         )
         
-        # Extract hidden states from hooks
-        hidden_states = {}
-        if self.activations:
+        # If extracting from first assistant token, get it from generation hooks
+        if extract_hidden_at == "first_assistant_token" and self.activations:
             for layer_name, activations in self.activations.items():
-                # activations shape: [batch, seq_len, hidden_dim]
-                if extract_hidden_at == "last_user_token":
-                    idx = hook_positions["extraction_point"]
-                    hidden_states[layer_name] = activations[0, idx, :]  # [hidden_dim]
-                elif extract_hidden_at == "first_assistant_token":
-                    # Use the first generated token position
-                    idx = hook_positions["extraction_point"]
-                    if activations.shape[1] > idx:
-                        hidden_states[layer_name] = activations[0, idx, :]
-                    else:
-                        # Fallback: use last position
-                        hidden_states[layer_name] = activations[0, -1, :]
+                seq_len = activations.shape[1]
+                # Use position right after input (first generated token)
+                idx = min(input_ids.shape[1], seq_len - 1)
+                hidden_states[layer_name] = activations[0, idx, :]
         
         # Tokenize full response for analysis
         full_tokens = self.tokenizer.convert_ids_to_tokens(generated_ids)
