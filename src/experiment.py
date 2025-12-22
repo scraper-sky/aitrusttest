@@ -410,7 +410,7 @@ def main():
     )
     
     if args.stage == "generate" or args.stage == "all":
-        runner.stage_generate(n_items=args.n_items)
+        runner.stage_generate(n_items=args.n_items, neutral_assistant_responses=getattr(args, 'neutral_responses', False))
     
     if args.stage == "behavioral" or args.stage == "all":
         metrics, df = runner.stage_behavioral()
