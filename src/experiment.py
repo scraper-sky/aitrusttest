@@ -323,8 +323,20 @@ class ExperimentRunner:
                 for conv, output in zip(test_conversations, outputs)
             ]
             avg_ur = sum(m.update_rate for m in metrics) / len(metrics)
+            
+            avg_probe_score = None
+            if layer_name in self.probe_trainer.probes:
+                try:
+                    probe = self.probe_trainer.probes[layer_name]
+                    hidden_states = self.probe_trainer.extract_hidden_states(outputs, layer_name)
+                    probe_scores = probe.predict(hidden_states)
+                    avg_probe_score = float(probe_scores.mean())
+                except Exception as e:
+                    print(f"Warning: Could not compute probe scores for steering: {e}")
+            
             intervention_metrics[strength] = {
                 "mean_update_rate": avg_ur,
+                "mean_probe_score": avg_probe_score,
                 "n": len(metrics)
             }
         
