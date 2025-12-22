@@ -151,8 +151,14 @@ class ActivationSteerer:
             else:
                 hidden_states = output
             
+            # Convert steering vector to match hidden states dtype and device
+            steering_vec = vector.vector.to(
+                device=hidden_states.device,
+                dtype=hidden_states.dtype
+            )
+            
             # Add steering vector
-            steered = hidden_states + self.steering_strength * vector.vector.to(hidden_states.device)
+            steered = hidden_states + self.steering_strength * steering_vec
             
             if isinstance(output, tuple):
                 return (steered,) + output[1:]
