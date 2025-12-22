@@ -2,6 +2,8 @@ import re
 from typing import List, Dict, Literal
 from dataclasses import dataclass
 import pandas as pd
+import numpy as np
+from scipy import stats
 
 from dataset import Conversation
 from model_runner import ModelOutput
@@ -195,6 +197,28 @@ class MetricsCalculator:
             stats[f"confidence_{conf_level}_pct"] = (df["confidence_level"] == conf_level).mean() * 100
         
         stats["verification_request_pct"] = df["requests_verification"].mean() * 100
+        
+        high_trust_ur = df[df["condition"] == "high_trust"]["update_rate"].values
+        low_trust_ur = df[df["condition"] == "low_trust"]["update_rate"].values
+        
+        if len(high_trust_ur) > 0 and len(low_trust_ur) > 0:
+            diff = high_trust_ur.mean() - low_trust_ur.mean()
+            stats["ur_difference"] = diff
+            
+            n_bootstrap = 10000
+            diffs = []
+            for _ in range(n_bootstrap):
+                h_indices = np.random.choice(len(high_trust_ur), len(high_trust_ur), replace=True)
+                l_indices = np.random.choice(len(low_trust_ur), len(low_trust_ur), replace=True)
+                diff_boot = high_trust_ur[h_indices].mean() - low_trust_ur[l_indices].mean()
+                diffs.append(diff_boot)
+            
+            stats["ur_difference_ci_lower"] = np.percentile(diffs, 2.5)
+            stats["ur_difference_ci_upper"] = np.percentile(diffs, 97.5)
+            
+            t_stat, p_value = stats.ttest_ind(high_trust_ur, low_trust_ur)
+            stats["ur_difference_t_stat"] = t_stat
+            stats["ur_difference_p_value"] = p_value
         
         return stats
     

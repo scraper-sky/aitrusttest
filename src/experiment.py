@@ -112,14 +112,31 @@ class ExperimentRunner:
         print(f"Overall Update Rate: {stats['overall_ur']:.3f}")
         print(f"High-trust UR: {stats['high_trust_ur']:.3f} (n={stats['high_trust_n']})")
         print(f"Low-trust UR: {stats['low_trust_ur']:.3f} (n={stats['low_trust_n']})")
-        print(f"Difference: {stats['high_trust_ur'] - stats['low_trust_ur']:.3f}")
+        if 'ur_difference' in stats:
+            diff = stats['ur_difference']
+            ci_lower = stats.get('ur_difference_ci_lower', 0)
+            ci_upper = stats.get('ur_difference_ci_upper', 0)
+            p_val = stats.get('ur_difference_p_value', 1.0)
+            print(f"Difference: {diff:.3f} [95% CI: {ci_lower:.3f}, {ci_upper:.3f}], p={p_val:.4f}")
+        else:
+            print(f"Difference: {stats['high_trust_ur'] - stats['low_trust_ur']:.3f}")
         
         if 'high_trust_final_True_ur' in stats:
-            print(f"\nBy final correction truth:")
-            print(f"  High-trust, True: {stats['high_trust_final_True_ur']:.3f}")
-            print(f"  High-trust, False: {stats['high_trust_final_False_ur']:.3f}")
-            print(f"  Low-trust, True: {stats['low_trust_final_True_ur']:.3f}")
-            print(f"  Low-trust, False: {stats['low_trust_final_False_ur']:.3f}")
+            print(f"\nBy final correction truth (epistemic check):")
+            print(f"  High-trust, True: {stats['high_trust_final_True_ur']:.3f} (n={stats.get('high_trust_final_True_ur_n', 0)})")
+            print(f"  High-trust, False: {stats['high_trust_final_False_ur']:.3f} (n={stats.get('high_trust_final_False_ur_n', 0)})")
+            print(f"  Low-trust, True: {stats['low_trust_final_True_ur']:.3f} (n={stats.get('low_trust_final_True_ur_n', 0)})")
+            print(f"  Low-trust, False: {stats['low_trust_final_False_ur']:.3f} (n={stats.get('low_trust_final_False_ur_n', 0)})")
+            ht_true = stats['high_trust_final_True_ur']
+            ht_false = stats['high_trust_final_False_ur']
+            lt_true = stats['low_trust_final_True_ur']
+            lt_false = stats['low_trust_final_False_ur']
+            if ht_true > ht_false and lt_true > lt_false:
+                print(f"  → Both conditions accept TRUE corrections more (epistemically sensible)")
+            elif ht_true > lt_true and ht_false > lt_false:
+                print(f"  → High-trust accepts MORE overall (deference effect)")
+            else:
+                print(f"  → Mixed pattern")
         
         df = self.metrics_calc.metrics_to_dataframe(metrics_list)
         
@@ -315,7 +332,12 @@ class ExperimentRunner:
         print("INTERVENTION RESULTS")
         print("=" * 60)
         for strength, metrics in sorted(intervention_metrics.items()):
-            print(f"Steering strength {strength:+.1f}: UR = {metrics['mean_update_rate']:.3f}")
+            ur = metrics['mean_update_rate']
+            probe_score = metrics.get('mean_probe_score', None)
+            if probe_score is not None:
+                print(f"Steering strength {strength:+.1f}: UR = {ur:.3f}, Probe score = {probe_score:.3f}")
+            else:
+                print(f"Steering strength {strength:+.1f}: UR = {ur:.3f}")
         
         results_path = self.data_dir / "results" / "intervention_results.json"
         with open(results_path, 'w') as f:
