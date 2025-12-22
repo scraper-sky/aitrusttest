@@ -38,7 +38,7 @@ class HookedModel:
             try:
                 model = AutoModelForCausalLM.from_pretrained(
                     model_name,
-                    torch_dtype=torch.float16,
+                    dtype=torch.float16,
                     device_map="auto"
                 )
                 self.model = model
@@ -46,13 +46,13 @@ class HookedModel:
                 print(f"Warning: device_map='auto' failed, trying manual device placement: {e}")
                 model = AutoModelForCausalLM.from_pretrained(
                     model_name,
-                    torch_dtype=torch.float16
+                    dtype=torch.float16
                 )
                 self.model = model.to(device)
         else:
             model = AutoModelForCausalLM.from_pretrained(
                 model_name,
-                torch_dtype=torch.float16 if use_half_precision else torch.float32
+                dtype=torch.float16 if use_half_precision else torch.float32
             )
             self.model = model.to(device)
         
