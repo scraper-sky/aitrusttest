@@ -288,20 +288,45 @@ class ExperimentRunner:
         # Select a subset for intervention (faster)
         test_conversations = conversations[:20]
         
-        # Get best layer from probes
+        # Find a layer with a trained probe
         if layer_name is None:
-            # Use middle layer as default
-            layer_name = self.layer_names[len(self.layer_names) // 2]
+            # Try to find the best layer with a trained probe
+            # Prefer layer 2 (best test AUC from results)
+            available_layers = [l for l in self.layer_names if l in self.probe_trainer.probes]
+            
+            if not available_layers:
+                # Try loading probes from saved results
+                probe_results_path = self.data_dir / "results" / "probe_results.json"
+                if probe_results_path.exists():
+                    print("Loading probes from saved results...")
+                    # We'd need to reload probes, but for now, try to train them
+                    print("No probes found. Running probe training first...")
+                    self.stage_probe(conversations=conversations)
+                    available_layers = [l for l in self.layer_names if l in self.probe_trainer.probes]
+                
+                if not available_layers:
+                    raise ValueError(
+                        "No trained probes found. Please run '--stage probe' first, "
+                        "or run '--stage all' to run all stages in sequence."
+                    )
+            
+            # Prefer layer 2 (transformer.h.2) if available, as it had best test AUC
+            if "transformer.h.2" in available_layers:
+                layer_name = "transformer.h.2"
+            else:
+                layer_name = available_layers[0]  # Use first available
         
         # Create steering vector from probe
-        if layer_name in self.probe_trainer.probes:
-            probe = self.probe_trainer.probes[layer_name]
-            from interventions import SteeringVector
-            steering_vector = SteeringVector.from_probe(probe, layer_name)
-        else:
-            print(f"Warning: No probe for {layer_name}, creating from activations...")
-            # Would need to extract activations first
-            raise ValueError("Need trained probe or activation data")
+        if layer_name not in self.probe_trainer.probes:
+            raise ValueError(
+                f"No probe found for layer {layer_name}. "
+                f"Available layers with probes: {list(self.probe_trainer.probes.keys())}"
+            )
+        
+        probe = self.probe_trainer.probes[layer_name]
+        from interventions import SteeringVector
+        steering_vector = SteeringVector.from_probe(probe, layer_name)
+        print(f"Using probe from layer: {layer_name}")
         
         # Run steering experiment
         steerer = ActivationSteerer(self.model)
