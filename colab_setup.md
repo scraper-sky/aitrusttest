@@ -15,13 +15,14 @@ from google.colab import drive
 drive.mount('/content/drive')
 
 # Or clone from GitHub
-# !git clone https://github.com/yourusername/aitrusttest.git
+!git clone https://github.com/scraper-sky/aitrusttest.git
 
 # Navigate to project
 import os
-os.chdir('/content/drive/MyDrive/aitrusttest')  # Adjust path as needed
-# OR
-# os.chdir('/content/aitrusttest')
+# If using GitHub (recommended):
+os.chdir('/content/aitrusttest')
+# OR if using Google Drive:
+# os.chdir('/content/drive/MyDrive/aitrusttest')
 
 # Install dependencies
 !pip install torch transformers numpy pandas scikit-learn matplotlib seaborn tqdm accelerate datasets
