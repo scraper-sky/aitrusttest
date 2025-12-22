@@ -3,7 +3,7 @@ from typing import List, Dict, Literal
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
-from scipy import stats
+from scipy import stats as scipy_stats
 
 from dataset import Conversation
 from model_runner import ModelOutput
@@ -216,7 +216,7 @@ class MetricsCalculator:
             stats["ur_difference_ci_lower"] = np.percentile(diffs, 2.5)
             stats["ur_difference_ci_upper"] = np.percentile(diffs, 97.5)
             
-            t_stat, p_value = stats.ttest_ind(high_trust_ur, low_trust_ur)
+            t_stat, p_value = scipy_stats.ttest_ind(high_trust_ur, low_trust_ur)
             stats["ur_difference_t_stat"] = t_stat
             stats["ur_difference_p_value"] = p_value
         
