@@ -234,7 +234,10 @@ class MetricsCalculator:
             for final_true in [True, False]:
                 subset = df[(df["condition"] == condition) & (df["final_correction_true"] == final_true)]
                 key = f"{condition}_final_{final_true}_ur"
-                stats[key] = subset["update_rate"].mean()
+                if len(subset) > 0:
+                    stats[key] = subset["update_rate"].mean()
+                else:
+                    stats[key] = 0.0
                 stats[f"{key}_n"] = len(subset)
         
         # Confidence breakdown
