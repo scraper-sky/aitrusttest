@@ -54,12 +54,24 @@ class HookedModel:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = device
         
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            dtype=torch.float16 if use_half_precision else torch.float32,
-            device_map=device if device == "cuda" else None
-        )
-        self.model = model.to(device)
+        # For larger models, use device_map for automatic GPU allocation
+        # For smaller models or CPU, use .to(device)
+        if device == "cuda" and use_half_precision:
+            # Use device_map for larger models (better memory management)
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                torch_dtype=torch.float16,
+                device_map="auto"  # Automatically distributes across available GPUs
+            )
+            self.model = model
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name,
+                dtype=torch.float16 if use_half_precision else torch.float32,
+                device_map=None
+            )
+            self.model = model.to(device)
+        
         self.model.eval()
         
         # Storage for hooks
@@ -260,14 +272,17 @@ def get_default_layers(model_name: str, n_layers: int = 5) -> List[str]:
         # Try to detect the correct pattern by loading a small part of the model
         # Common patterns for different architectures:
         # GPT-2: transformer.h.{i}
-        # LLaMA/Mistral: model.layers.{i}
+        # LLaMA/Mistral/Gemma: model.layers.{i}
         # GPT-NeoX: gpt_neox.layers.{i}
         
-        # Try GPT-2 pattern first (most common for testing)
-        if "gpt2" in model_name.lower():
+        # Detect architecture from model name
+        model_name_lower = model_name.lower()
+        if "gpt2" in model_name_lower:
             pattern = "transformer.h.{}"
+        elif any(x in model_name_lower for x in ["gemma", "llama", "mistral", "phi"]):
+            pattern = "model.layers.{}"
         else:
-            # Try common patterns
+            # Default: try model.layers first (most common for modern models)
             pattern = "model.layers.{}"
         
         # Return layer names
