@@ -140,6 +140,9 @@ class HookedModel:
         input_ids = inputs["input_ids"]
         attention_mask = inputs.get("attention_mask", None)
         
+        # Initialize hook_positions dict for tracking
+        hook_positions = {}
+        
         # Extract hidden states BEFORE generation (if needed)
         hidden_states = {}
         if extract_hidden_at == "last_user_token":
@@ -158,6 +161,7 @@ class HookedModel:
                     # Use last token of input
                     idx = min(input_ids.shape[1] - 1, seq_len - 1)
                     hidden_states[layer_name] = activations[0, idx, :]
+                    hook_positions[layer_name] = idx
         
         # Prepare generation kwargs
         generation_kwargs = {
@@ -202,6 +206,7 @@ class HookedModel:
                 # Use position right after input (first generated token)
                 idx = min(input_ids.shape[1], seq_len - 1)
                 hidden_states[layer_name] = activations[0, idx, :]
+                hook_positions[layer_name] = idx
         
         # Tokenize full response for analysis
         full_tokens = self.tokenizer.convert_ids_to_tokens(generated_ids)
