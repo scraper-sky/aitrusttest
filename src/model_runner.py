@@ -73,11 +73,17 @@ class HookedModel:
         self.clear_hooks()
         self.activations = {}
         
-        all_module_names = list(dict(self.model.model.named_modules()).keys())
+        model_to_hook = self.model
+        if hasattr(self.model, 'model'):
+            model_to_hook = self.model.model
+        elif hasattr(self.model, 'transformer'):
+            model_to_hook = self.model.transformer
+        
+        all_module_names = list(dict(model_to_hook.named_modules()).keys())
         
         for layer_name in layer_names:
             try:
-                layer = dict(self.model.model.named_modules())[layer_name]
+                layer = dict(model_to_hook.named_modules())[layer_name]
                 handle = layer.register_forward_hook(self._make_hook(layer_name))
                 self.hook_handles.append(handle)
             except KeyError:
