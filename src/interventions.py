@@ -118,10 +118,12 @@ class ActivationSteerer:
             model_to_hook = self.model.model.model
         elif hasattr(self.model.model, 'transformer'):
             model_to_hook = self.model.model.transformer
-        elif hasattr(self.model.model, 'layers'):
-            model_to_hook = self.model.model
         
-        layer = dict(model_to_hook.named_modules())[layer_name]
+        all_modules = dict(model_to_hook.named_modules())
+        if layer_name not in all_modules:
+            all_modules = dict(self.model.model.named_modules())
+        
+        layer = all_modules[layer_name]
         handle = layer.register_forward_hook(self._steering_hook(layer_name))
         
         try:
