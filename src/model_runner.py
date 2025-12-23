@@ -222,7 +222,7 @@ def get_default_layers(model_name: str, n_layers: int = 5) -> List[str]:
         
         model_name_lower = model_name.lower()
         if "gpt2" in model_name_lower:
-            pattern = "transformer.h.{}"
+            pattern = "h.{}"
         elif "pythia" in model_name_lower or "gpt-neox" in model_name_lower or "gpt_neox" in model_name_lower:
             pattern = "gpt_neox.layers.{}"
         elif "phi" in model_name_lower:
